@@ -18,8 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     
     env:
-      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID_PULL_REQUEST }}
-      ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      ARM_CLIENT_ID: ${{ github.event_name == 'pull_request' && vars.AZURE_CLIENT_ID_PULL_REQUEST || vars.AZURE_CLIENT_ID_MAIN }}
       ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
     
@@ -36,19 +35,10 @@ jobs:
           with:
             terraform_version: latest
 
-        - name: Azure Login
-          if: github.event_name == 'pull_request'
+        - name: Azure Login (OIDC)
           uses: azure/login@v1
           with:
-            client-id: ${{ vars.AZURE_CLIENT_ID_MAIN }}
-            tenant-id: ${{ vars.AZURE_TENANT_ID }}
-            subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-
-        - name: Azure Login
-          if: github.event_name == 'push'
-          uses: azure/login@v1
-          with:
-            client-id: ${{ vars.AZURE_CLIENT_ID }}
+            client-id: ${{ github.event_name == 'pull_request' && vars.AZURE_CLIENT_ID_PULL_REQUEST || vars.AZURE_CLIENT_ID_MAIN }}
             tenant-id: ${{ vars.AZURE_TENANT_ID }}
             subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
