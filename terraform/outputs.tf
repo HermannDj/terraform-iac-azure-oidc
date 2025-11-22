@@ -5,5 +5,5 @@ output "acr_login_server" {
 
 output "app_service_url" {
   description = "The default URL of the Azure App Service"
-  value       = azurerm_app_service.app.default_site_hostname
+  value       = azurerm_linux_web_app.app.default_hostname
 }

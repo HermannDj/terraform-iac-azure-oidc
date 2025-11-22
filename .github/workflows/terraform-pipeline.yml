@@ -79,11 +79,9 @@ jobs:
           run: terraform apply -auto-approve -lock-timeout=5m tfplan
           timeout-minutes: 30
 
-        - name: Cleanup - Force Unlock on Failure
+        - name: Cleanup - Post Failure Info
           if: failure() && (steps.plan.outcome == 'failure' || steps.apply.outcome == 'failure')
-          continue-on-error: true
           run: |
-            echo "Attempting to force unlock state if locked..."
-            # Get the lock ID from the error output if available
-            # This is a safety measure for future runs
-            terraform force-unlock -force $(terraform show -json 2>&1 | grep -oP 'ID:\s+\K[a-f0-9-]+' | head -1) || true
+            echo "::error::Terraform operation failed. If this is due to a state lock, you may need to manually force-unlock."
+            echo "::error::To manually unlock, run: terraform force-unlock <LOCK_ID>"
+            echo "::error::Find the LOCK_ID in the error output above."
