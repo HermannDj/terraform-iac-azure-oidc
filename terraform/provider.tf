@@ -10,11 +10,9 @@ terraform {
 provider "azurerm" {
   features {
   }
-  subscription_id = var.subscription_id
-
-  # Configuration pour l'authentification OIDC
-  use_oidc   = true
-  oidc_token = var.oidc_token
-  tenant_id  = var.tenant_id
-  client_id  = var.client_id
+  
+  # OIDC authentication is configured via environment variables:
+  # ARM_CLIENT_ID, ARM_TENANT_ID, ARM_SUBSCRIPTION_ID
+  # These are set in the GitHub Actions workflow
+  use_oidc = true
 }

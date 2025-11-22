@@ -64,7 +64,6 @@ jobs:
           id: plan
           run: |
             terraform plan \
-              -var="subscription_id"="${{ vars.AZURE_SUBSCRIPTION_ID }}" \
               -var="resource_group_name"="${{ vars.TF_RESOURCE_GROUP_NAME }}" \
               -var="acr_name"="${{ vars.TF_ACR_NAME }}" \
               -var="app_service_plan_name"="${{ vars.TF_APP_SERVICE_PLAN_NAME }}" \
