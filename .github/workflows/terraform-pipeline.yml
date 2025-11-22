@@ -1,0 +1,90 @@
+name: Terraform Pipeline
+
+on:
+    pull_request:
+        branches:
+        - main
+    push:
+        branches:
+        - main
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  terraform:
+    name: Terraform workflow
+    runs-on: ubuntu-latest
+    
+    env:
+      ARM_CLIENT_ID: ${{ github.event_name == 'pull_request' && vars.AZURE_CLIENT_ID_PULL_REQUEST || vars.AZURE_CLIENT_ID_MAIN }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+    
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:  
+        - name: Checkout repository
+          uses: actions/checkout@v3
+          
+        - name: Setup Terraform
+          uses: hashicorp/setup-terraform@v2
+          with:
+            terraform_version: latest
+
+        - name: Debug - show selected client id
+          run: |
+            echo "GITHUB_EVENT_NAME=$GITHUB_EVENT_NAME"
+            echo "client-id (pull_request var): ${{ vars.AZURE_CLIENT_ID_PULL_REQUEST }}"
+            echo "client-id (main var): ${{ vars.AZURE_CLIENT_ID_MAIN }}"
+            echo "chosen client-id: ${{ github.event_name == 'pull_request' && vars.AZURE_CLIENT_ID_PULL_REQUEST || vars.AZURE_CLIENT_ID_MAIN }}"
+
+        - name: Azure Login (OIDC)
+          uses: azure/login@v1
+          with:
+            client-id: ${{ github.event_name == 'pull_request' && vars.AZURE_CLIENT_ID_PULL_REQUEST || vars.AZURE_CLIENT_ID_MAIN }}
+            tenant-id: ${{ vars.AZURE_TENANT_ID }}
+            subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+        - name: Terraform Init
+          id: init
+          run: terraform init
+          timeout-minutes: 5
+
+        - name: Terraform Fmt Check
+          run: terraform fmt -check
+
+        - name: Terraform Validate
+          run: terraform validate
+          
+        - name: Terraform Plan
+          id: plan
+          run: |
+            terraform plan \
+              -var="subscription_id"="${{ vars.AZURE_SUBSCRIPTION_ID }}" \
+              -var="resource_group_name"="${{ vars.TF_RESOURCE_GROUP_NAME }}" \
+              -var="acr_name"="${{ vars.TF_ACR_NAME }}" \
+              -var="app_service_plan_name"="${{ vars.TF_APP_SERVICE_PLAN_NAME }}" \
+              -var="app_service_name"="${{ vars.TF_APP_SERVICE_NAME }}" \
+              -var="location"="${{ vars.TF_LOCATION }}" \
+              -lock-timeout=5m \
+              -out=tfplan
+          timeout-minutes: 10
+
+        - name: Terraform Apply
+          if: github.event_name == 'push'
+          id: apply
+          run: terraform apply -auto-approve -lock-timeout=5m tfplan
+          timeout-minutes: 30
+
+        - name: Cleanup - Force Unlock on Failure
+          if: failure() && (steps.plan.outcome == 'failure' || steps.apply.outcome == 'failure')
+          continue-on-error: true
+          run: |
+            echo "Attempting to force unlock state if locked..."
+            # Get the lock ID from the error output if available
+            # This is a safety measure for future runs
+            terraform force-unlock -force $(terraform show -json 2>&1 | grep -oP 'ID:\s+\K[a-f0-9-]+' | head -1) || true
