@@ -35,6 +35,13 @@ jobs:
           with:
             terraform_version: latest
 
+        - name: Debug - show selected client id
+          run: |
+            echo "GITHUB_EVENT_NAME=$GITHUB_EVENT_NAME"
+            echo "client-id (pull_request var): ${{ vars.AZURE_CLIENT_ID_PULL_REQUEST }}"
+            echo "client-id (main var): ${{ vars.AZURE_CLIENT_ID_MAIN }}"
+            echo "chosen client-id: ${{ github.event_name == 'pull_request' && vars.AZURE_CLIENT_ID_PULL_REQUEST || vars.AZURE_CLIENT_ID_MAIN }}"
+
         - name: Azure Login (OIDC)
           uses: azure/login@v1
           with:
