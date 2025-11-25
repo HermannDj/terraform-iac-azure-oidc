@@ -14,13 +14,17 @@ permissions:
 
 jobs:
   terraform:
-    name: Terraform workflow
+    name: Terraform workflow ${{ matrix.environment }}
     runs-on: ubuntu-latest
-    
+
+    strategy:
+      matrix:
+        environment: [test, production]
+      
     env:
-      ARM_CLIENT_ID: ${{ github.event_name == 'pull_request' && vars.AZURE_CLIENT_ID_PULL_REQUEST || vars.AZURE_CLIENT_ID_MAIN }}
+      ARM_CLIENT_ID: ${{ github.event_name == 'pull_request' && vars.AZURE_CLIENT_ID_PULL_REQUEST || vars.CLIENT_ID }}
       ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_TENANT_ID: ${{ vars.TENANT_ID }}
     
     defaults:
       run:
@@ -35,24 +39,26 @@ jobs:
           with:
             terraform_version: latest
 
-        - name: Debug - show selected client id
-          run: |
-            echo "GITHUB_EVENT_NAME=$GITHUB_EVENT_NAME"
-            echo "client-id (pull_request var): ${{ vars.AZURE_CLIENT_ID_PULL_REQUEST }}"
-            echo "client-id (main var): ${{ vars.AZURE_CLIENT_ID_MAIN }}"
-            echo "chosen client-id: ${{ github.event_name == 'pull_request' && vars.AZURE_CLIENT_ID_PULL_REQUEST || vars.AZURE_CLIENT_ID_MAIN }}"
 
         - name: Azure Login (OIDC)
           uses: azure/login@v1
           with:
-            client-id: ${{ github.event_name == 'pull_request' && vars.AZURE_CLIENT_ID_PULL_REQUEST || vars.AZURE_CLIENT_ID_MAIN }}
-            tenant-id: ${{ vars.AZURE_TENANT_ID }}
+            client-id: ${{ github.event_name == 'pull_request' && vars.CLIENT_ID}}
+            tenant-id: ${{ vars.TENANT_ID }}
             subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
         - name: Terraform Init
           id: init
           run: terraform init
           timeout-minutes: 5
+
+          
+        - name: Terraform Workspace Select
+          run: |
+            terraform workspace select ${{ matrix.environment }} || terraform workspace new ${{ matrix.environment }}
+
+        - name: Log Terraform Workspace
+          run: terraform workspace show
 
         - name: Terraform Fmt Check
           run: terraform fmt -check
@@ -70,13 +76,13 @@ jobs:
               -var="app_service_name"="${{ vars.TF_APP_SERVICE_NAME }}" \
               -var="location"="${{ vars.TF_LOCATION }}" \
               -lock-timeout=5m \
-              -out=tfplan
+              -out=tfplan-${{ matrix.environment }}
           timeout-minutes: 10
 
         - name: Terraform Apply
           if: github.event_name == 'push'
           id: apply
-          run: terraform apply -auto-approve -lock-timeout=5m tfplan
+          run: terraform apply -auto-approve -lock-timeout=5m tfplan-${{ matrix.environment }}
           timeout-minutes: 30
 
         - name: Cleanup - Post Failure Info
