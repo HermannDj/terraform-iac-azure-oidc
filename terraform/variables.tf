@@ -27,24 +27,3 @@ variable "app_service_plan_name" {
   type        = string
   default     = "my-app-service"
 }
-
-variable "subscription_id" {
-  description = "The Azure Subscription ID"
-  type        = string
-}
-
-variable "tenant_id" {
-  description = "The Azure AD Tenant ID"
-  type        = string
-}
-
-variable "client_id" {
-  description = "The Azure AD Application (client) ID"
-  type        = string
-}
-
-variable "oidc_token" {
-  description = "The OIDC token for authentication"
-  type        = string
-  sensitive   = true
-}

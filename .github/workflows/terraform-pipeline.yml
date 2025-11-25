@@ -50,7 +50,9 @@ jobs:
             subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
         - name: Terraform Init
+          id: init
           run: terraform init
+          timeout-minutes: 5
 
         - name: Terraform Fmt Check
           run: terraform fmt -check
@@ -59,16 +61,27 @@ jobs:
           run: terraform validate
           
         - name: Terraform Plan
+          id: plan
           run: |
             terraform plan \
-              -var="subscription_id"="${{ vars.AZURE_SUBSCRIPTION_ID }}" \
               -var="resource_group_name"="${{ vars.TF_RESOURCE_GROUP_NAME }}" \
               -var="acr_name"="${{ vars.TF_ACR_NAME }}" \
               -var="app_service_plan_name"="${{ vars.TF_APP_SERVICE_PLAN_NAME }}" \
               -var="app_service_name"="${{ vars.TF_APP_SERVICE_NAME }}" \
               -var="location"="${{ vars.TF_LOCATION }}" \
+              -lock-timeout=5m \
               -out=tfplan
+          timeout-minutes: 10
 
         - name: Terraform Apply
           if: github.event_name == 'push'
-          run: terraform apply -auto-approve tfplan
+          id: apply
+          run: terraform apply -auto-approve -lock-timeout=5m tfplan
+          timeout-minutes: 30
+
+        - name: Cleanup - Post Failure Info
+          if: failure() && (steps.plan.outcome == 'failure' || steps.apply.outcome == 'failure')
+          run: |
+            echo "::error::Terraform operation failed. If this is due to a state lock, you may need to manually force-unlock."
+            echo "::error::To manually unlock, run: terraform force-unlock <LOCK_ID>"
+            echo "::error::Find the LOCK_ID in the error output above."
