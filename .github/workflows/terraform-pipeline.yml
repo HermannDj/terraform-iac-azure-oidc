@@ -16,15 +16,16 @@ jobs:
   terraform:
     name: Terraform workflow ${{ matrix.environment }}
     runs-on: ubuntu-latest
+    environment: ${{ matrix.environment }}
 
     strategy:
       matrix:
         environment: [test, production]
       
     env:
-      ARM_CLIENT_ID: ${{ github.event_name == 'pull_request' && vars.AZURE_CLIENT_ID_PULL_REQUEST || vars.CLIENT_ID }}
+      ARM_CLIENT_ID: ${{ vars.CLIENT_ID }}
       ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      ARM_TENANT_ID: ${{ vars.TENANT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
     
     defaults:
       run:
@@ -43,8 +44,8 @@ jobs:
         - name: Azure Login (OIDC)
           uses: azure/login@v1
           with:
-            client-id: ${{ github.event_name == 'pull_request' && vars.CLIENT_ID}}
-            tenant-id: ${{ vars.TENANT_ID }}
+            client-id: ${{ vars.CLIENT_ID }}
+            tenant-id: ${{ vars.AZURE_TENANT_ID }}
             subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
         - name: Terraform Init
